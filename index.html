@@ -35,7 +35,8 @@ body.out nav,body.out #lo{display:none}#lo{position:fixed;top:calc(env(safe-area
 <label>Deskripsi</label><input id="desk" placeholder="cth: Sarapan" autocomplete="off" list="dl"><datalist id="dl"></datalist>
 <label>Kategori</label><select id="kat"></select>
 <label id="lsaku">Dari saku</label><select id="saku"></select>
-<label>Tanggal</label><input id="tgl" type="date"><button id="save">Simpan</button></section>
+<label>Tanggal</label><input id="tgl" type="date">
+<label>Bulan anggaran</label><select id="geser"><option value="0">0 · Sesuai tanggal</option><option value="1">1 · Bulan berikutnya</option></select><div id="blnl" style="font-size:13px;color:var(--mut);margin-top:4px"></div><button id="save">Simpan</button></section>
 
 <section id="mut"><h2>Mutasi antar saku</h2>
 <label>Dari saku</label><select id="dari"></select><label>Ke saku</label><select id="ke"></select>
@@ -48,7 +49,7 @@ body.out nav,body.out #lo{display:none}#lo{position:fixed;top:calc(env(safe-area
 <section id="setup"><h2>Pengaturan</h2>
 
 <h3>Kategori baru</h3><input id="nk" placeholder="Nama kategori"><label>Jenis</label><select id="nj"></select><button id="addk">Tambah kategori</button>
-<h3>Ubah jenis kategori</h3><select id="ek"></select><label>Jenis baru</label><select id="ej"></select><button id="ubj">Simpan jenis</button>
+<h3>Ubah jenis kategori</h3><select id="ek"></select><label>Jenis</label><select id="ej"></select><label>Bulan anggaran bawaan</label><select id="eg"><option value="0">0 · Sesuai tanggal</option><option value="1">1 · Bulan berikutnya</option></select><button id="ubj">Simpan kategori</button>
 <h3>Saku baru</h3><input id="ns" placeholder="Nama saku"><label>Jenis</label><select id="nt"><option>Biasa</option><option>Kredit</option></select>
 <label>Saldo awal (kartu kredit: limit)</label><input id="sawal" inputmode="numeric"><button id="adds">Tambah saku</button>
 <h3>Ubah saldo awal / limit</h3><select id="tsaku"></select><label>Saldo awal</label><input id="awal" inputmode="numeric"><button id="seta">Simpan saldo awal</button>
@@ -75,19 +76,19 @@ const opts=(a,k)=>a.slice().sort((x,y)=>(U[k+y]||0)-(U[k+x]||0)).map(x=>`<option
 function cc(){const R='Superbank_Kartu Kredit',cards=S.saku.filter(s=>s.tipe=='Kredit'),used=cards.reduce((a,s)=>a+(+s.awal||0)-(S.saldo[s.nama]||0),0),bg=(S.bunga||{})[R]||0,have=(S.saldo[R]||0)-bg,gap=used-have;
  $('cc').innerHTML=cards.length?`<div class="row" style="flex-direction:column;gap:4px"><small>Terpakai di kartu kredit</small><b>${rp(used)}</b><small>Terkumpul di ${R} (tanpa bunga)</small><b>${rp(have)}</b><small>${gap>0?'Masih kurang':'Sudah cukup, lebih'}</small><b style="color:var(--${gap>0?'out':'in'})">${rp(Math.abs(gap))}</b><small>Bunga Superbank yang sudah masuk (tidak dihitung)</small><b>${rp(bg)}</b></div>`:''}
 function render(){const sk=S.saku.map(s=>s.nama),f=(id,a,k)=>{const v=$(id).value;$(id).innerHTML=opts(a,k);if(v&&a.includes(v))$(id).value=v};
- f('kat',S.kat.filter(k=>(jenis=='out'?['Pengeluaran','Keduanya']:['Pemasukan','Keduanya']).includes(k.jenis)).map(k=>k.nama),'k');$('ek').innerHTML=S.kat.map(k=>`<option value="${k.nama}">${k.nama} · ${k.jenis}</option>`).join('');['saku','dari','ke','tsaku'].forEach(i=>f(i,sk,'s'));
+ f('kat',S.kat.filter(k=>(jenis=='out'?['Pengeluaran','Keduanya']:['Pemasukan','Keduanya']).includes(k.jenis)).map(k=>k.nama),'k');{const v=$('ek').value;$('ek').innerHTML=S.kat.map(k=>`<option value="${k.nama}">${k.nama} · ${k.jenis}${k.geser?' · +1':''}</option>`).join('');if(v)$('ek').value=v}['saku','dari','ke','tsaku'].forEach(i=>f(i,sk,'s'));
  $('list').innerHTML=S.saku.map(s=>{const t=S.tally[s.nama];return `<div class="row" data-n="${s.nama}"><div>${s.nama}<small>${s.tipe=='Kredit'?'Sisa limit':'Saldo'}${t?' · '+(t.selisih==0?'cocok ✓':'selisih '+rp(t.selisih))+' ('+t.tgl+')':''}</small></div><b>${rp(S.saldo[s.nama]||0)}</b></div>`}).join('');
  $('tot').textContent=rp(S.saku.filter(s=>s.tipe!='Kredit').reduce((a,s)=>a+(S.saldo[s.nama]||0),0));
- cc();$('dl').innerHTML=J('ds',[]).map(d=>`<option value="${d}">`).join('')}
+ cc();defG();$('ek').onchange&&$('ek').onchange();$('dl').innerHTML=J('ds',[]).map(d=>`<option value="${d}">`).join('')}
 ['amt','mamt','aamt','awal','sawal'].forEach(id=>$(id).oninput=e=>{const d=e.target.value.replace(/\D/g,'');e.target.dataset.v=d;e.target.value=d?(+d).toLocaleString('id-ID'):''});
 const num=id=>+($(id).dataset.v||0);
 function mode(j){jenis=j;$('bo').className=j=='out'?'on':'';$('bi').className=j=='in'?'on':'';$('lsaku').textContent=j=='out'?'Dari saku':'Ke saku';render()}
 $('bo').onclick=()=>mode('out');$('bi').onclick=()=>mode('in');
-$('save').onclick=()=>{const n=num('amt'),o={a:'addTx',id:uid(),tanggal:$('tgl').value,desk:$('desk').value.trim(),jenis,nominal:n,kat:$('kat').value,saku:$('saku').value};
+$('save').onclick=()=>{const n=num('amt'),o={a:'addTx',id:uid(),tanggal:$('tgl').value,desk:$('desk').value.trim(),jenis,nominal:n,kat:$('kat').value,saku:$('saku').value,geser:+$('geser').value};
  if(!n||!o.kat||!o.saku)return toast('Isi nominal, kategori, dan saku');
  U['k'+o.kat]=(U['k'+o.kat]||0)+1;U['s'+o.saku]=(U['s'+o.saku]||0)+1;ls.use=JSON.stringify(U);
  if(o.desk)ls.ds=JSON.stringify([...new Set([o.desk,...J('ds',[])])].slice(0,150));
- queue(o);$('amt').value='';$('amt').dataset.v=0;$('desk').value='';toast('Tersimpan ✓',o.id)};
+ queue(o);$('amt').value='';$('amt').dataset.v=0;$('desk').value='';defG.k=null;defG();toast('Tersimpan ✓',o.id)};
 $('msave').onclick=()=>{const o={a:'addMut',id:uid(),tanggal:$('mtgl').value,dari:$('dari').value,ke:$('ke').value,nominal:num('mamt'),cat:$('mcat').value};
  if(!o.nominal||o.dari==o.ke)return toast('Isi nominal dan pilih dua saku berbeda');
  queue(o);$('mamt').value='';$('mamt').dataset.v=0;$('mcat').value='';toast('Mutasi tersimpan ✓',o.id)};
@@ -103,9 +104,13 @@ document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>show(a.dataset.t));
 function show(t){document.querySelectorAll('section').forEach(s=>s.className=s.id==t?'on':'');document.querySelectorAll('nav a').forEach(a=>a.className=a.dataset.t==t?'on':'')}
 $('gpin').onclick=async()=>{const p=$('pbaru').value.trim();try{await api('ubahPin',{pinBaru:p});C.pin=p;$('pbaru').value='';toast('PIN diubah')}catch(e){toast(e.message)}};
 $('keluar').onclick=()=>{if(Q.some(x=>x.u==C.user)&&!confirm('Ada transaksi belum terkirim, akan terkirim saat kamu masuk lagi. Keluar?'))return;location.reload()};
-$('nj').innerHTML=$('ej').innerHTML=JN.map(x=>`<option>${x}</option>`).join('');$('ubj').onclick=()=>run('ubahJenis',{nama:$('ek').value,jenis:$('ej').value},'Jenis diubah');
+$('nj').innerHTML=$('ej').innerHTML=JN.map(x=>`<option>${x}</option>`).join('');$('ubj').onclick=()=>run('ubahJenis',{nama:$('ek').value,jenis:$('ej').value,geser:+$('eg').value},'Kategori diubah');
+function lbl(){const d=$('tgl').value;if(!d)return;const [y,m]=d.split('-');$('blnl').textContent='Masuk anggaran: '+new Date(+y,m-1+ +$('geser').value,1).toLocaleDateString('id-ID',{month:'long',year:'numeric'})}
+function defG(){if($('kat').value===defG.k)return;defG.k=$('kat').value;const k=S.kat.find(x=>x.nama==defG.k);$('geser').value=k&&k.geser?1:0;lbl()}
+$('kat').onchange=defG;$('geser').onchange=lbl;$('tgl').onchange=lbl;
+$('ek').onchange=()=>{const k=S.kat.find(x=>x.nama==$('ek').value);if(k){$('ej').value=k.jenis;$('eg').value=k.geser?1:0}};
 $('lo').onclick=()=>$('keluar').click();
-$('tgl').value=$('mtgl').value=today();$('curl').value=B.url;$('cuser').value=B.user;$('rem').checked=B.rem;ls.removeItem('S');ls.removeItem('cfg');if(!B.url)document.querySelector('details').open=true;
+$('tgl').value=$('mtgl').value=today();lbl();$('curl').value=B.url;$('cuser').value=B.user;$('rem').checked=B.rem;ls.removeItem('S');ls.removeItem('cfg');if(!B.url)document.querySelector('details').open=true;
 show('login');if(B.user)$('cpin').focus();let hid=0;document.addEventListener('visibilitychange',()=>{if(document.hidden)hid=Date.now();else if(C&&Date.now()-hid>KUNCI)location.reload()});render();flush();addEventListener('online',flush);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
 </script></body></html>

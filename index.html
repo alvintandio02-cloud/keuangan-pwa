@@ -21,8 +21,14 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);b
 nav a{flex:1;text-align:center;padding:15px 0;color:var(--mut);font-size:14px}nav a.on{color:var(--pri);font-weight:700}
 #toast{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));background:#17211b;color:#fff;padding:12px 14px;border-radius:10px;display:none;justify-content:space-between;align-items:center}
 #toast button{width:auto;margin:0;padding:4px 12px;background:none;color:#86efac}
-section{display:none}section.on{display:block}dialog{border:0;border-radius:14px;background:var(--card);color:var(--tx);width:90%;max-width:420px}
-</style></head><body><main>
+body.out nav{display:none}section{display:none}section.on{display:block}dialog{border:0;border-radius:14px;background:var(--card);color:var(--tx);width:90%;max-width:420px}
+</style></head><body class="out"><main>
+<section id="login"><h2>Masuk</h2>
+<label>Username</label><input id="cuser" autocapitalize="none" autocomplete="username">
+<label>PIN (angka)</label><input id="cpin" type="password" inputmode="numeric" autocomplete="current-password">
+<label style="display:flex;gap:8px;align-items:center;font-size:15px;color:var(--tx)"><input id="rem" type="checkbox" style="width:auto"> Ingat username saya</label>
+<button id="csave">Masuk</button>
+<details style="margin-top:18px;color:var(--mut)"><summary>URL Web App</summary><input id="curl" placeholder="https://script.google.com/macros/s/.../exec"></details></section>
 <section id="catat"><h2>Catat transaksi</h2>
 <div class="seg"><button id="bo" class="on">Pengeluaran</button><button id="bi">Pemasukan</button></div>
 <label>Nominal</label><input id="amt" inputmode="numeric" placeholder="0">
@@ -40,7 +46,7 @@ section{display:none}section.on{display:block}dialog{border:0;border-radius:14px
 <p style="color:var(--mut);font-size:13px">Ketuk saku untuk mencocokkan dengan saldo aktual.</p><div id="list"></div></section>
 
 <section id="setup"><h2>Pengaturan</h2>
-<h3>Masuk</h3><label>URL Web App</label><input id="curl"><label>Username</label><input id="cuser" autocapitalize="none" autocomplete="username"><label>PIN (angka)</label><input id="cpin" type="password" inputmode="numeric" autocomplete="current-password"><button id="csave">Masuk</button>
+
 <h3>Kategori baru</h3><input id="nk" placeholder="Nama kategori"><button id="addk">Tambah kategori</button>
 <h3>Saku baru</h3><input id="ns" placeholder="Nama saku"><label>Jenis</label><select id="nt"><option>Biasa</option><option>Kredit</option></select>
 <label>Saldo awal (kartu kredit: limit)</label><input id="sawal" inputmode="numeric"><button id="adds">Tambah saku</button>
@@ -53,16 +59,16 @@ section{display:none}section.on{display:block}dialog{border:0;border-radius:14px
 <nav><a data-t="catat">Catat</a><a data-t="mut">Mutasi</a><a data-t="saldo">Saldo</a><a data-t="setup">Setup</a></nav>
 <script>
 const $=id=>document.getElementById(id),ls=localStorage,J=(k,d)=>{try{return JSON.parse(ls[k])??d}catch{return d}};
-let C=J('cfg',null),S=J('S',{kat:[],saku:[],saldo:{},tally:{}}),Q=J('Q',[]),U=J('use',{}),jenis='out',cur;
+const KUNCI=5*60e3;let C=null,B=J('base',{url:'',user:'',rem:false}),S={kat:[],saku:[],saldo:{},tally:{}},Q=J('Q',[]),U=J('use',{}),jenis='out',cur;
 const rp=n=>(n<0?'-':'')+'Rp'+Math.abs(Math.round(n)).toLocaleString('id-ID');
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const sv=()=>ls.Q=JSON.stringify(Q);
 async function api(a,p={}){const r=await fetch(C.url,{method:'POST',body:JSON.stringify({...p,user:C.user,pin:C.pin,a})});const j=await r.json();if(!j.ok)throw Error(j.error);return j.data}
 function toast(m,id){const t=$('toast');t.innerHTML=`<span>${m}</span>`+(id?`<button onclick="undo('${id}')">Undo</button>`:'');t.style.display='flex';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',8000)}
-async function flush(){if(!C)return;while(Q.length){try{await api(Q[0].a,Q[0]);Q.shift();sv()}catch(e){if(!navigator.onLine||e instanceof TypeError)return;toast('Gagal: '+e.message);Q.shift();sv()}}refresh()}
-async function refresh(){if(!C||Q.length)return;try{S=await api('init');ls.S=JSON.stringify(S);render()}catch(e){}}
-function queue(o){Q.push(o);sv();flush()}
+async function flush(){if(!C)return;let o;while(o=Q.find(x=>x.u==C.user)){try{await api(o.a,o)}catch(e){if(!navigator.onLine||e instanceof TypeError)return;toast('Gagal: '+e.message)}Q.splice(Q.indexOf(o),1);sv()}refresh()}
+async function refresh(){if(!C||Q.some(x=>x.u==C.user))return;try{S=await api('init');render()}catch(e){}}
+function queue(o){o.u=C.user;Q.push(o);sv();flush()}
 async function undo(id){$('toast').style.display='none';const i=Q.findIndex(x=>x.id==id);if(i>=0){Q.splice(i,1);sv();return toast('Dibatalkan')}try{await api('undo',{id});toast('Dibatalkan');refresh()}catch(e){toast('Undo gagal: '+e.message)}}
 const opts=(a,k)=>a.slice().sort((x,y)=>(U[k+y]||0)-(U[k+x]||0)).map(x=>`<option>${x}</option>`).join('');
 function cc(){const R='Superbank_Kartu Kredit',cards=S.saku.filter(s=>s.tipe=='Kredit'),used=cards.reduce((a,s)=>a+(+s.awal||0)-(S.saldo[s.nama]||0),0),bg=(S.bunga||{})[R]||0,have=(S.saldo[R]||0)-bg,gap=used-have;
@@ -88,15 +94,15 @@ async function run(a,p,m){try{await api(a,p);toast(m);refresh()}catch(e){toast('
 $('addk').onclick=()=>$('nk').value.trim()&&run('addKat',{nama:$('nk').value.trim()},'Kategori ditambah').then(()=>$('nk').value='');
 $('adds').onclick=()=>$('ns').value.trim()&&run('addSaku',{nama:$('ns').value.trim(),tipe:$('nt').value,awal:num('sawal')},'Saku ditambah').then(()=>$('ns').value='');
 $('seta').onclick=()=>run('setAwal',{nama:$('tsaku').value,awal:num('awal')},'Saldo awal disimpan');
-$('csave').onclick=async()=>{const old=C;C={url:$('curl').value.trim(),user:$('cuser').value.trim(),pin:$('cpin').value.trim()};try{S=await api('init');ls.cfg=JSON.stringify(C);ls.S=JSON.stringify(S);render();toast('Masuk sebagai '+C.user);show('catat')}catch(e){C=old;toast(e.message)}};
+$('csave').onclick=async()=>{const old=C;C={url:$('curl').value.trim(),user:$('cuser').value.trim(),pin:$('cpin').value.trim()};try{S=await api('init');B={url:C.url,user:$('rem').checked?C.user:'',rem:$('rem').checked};ls.base=JSON.stringify(B);$('cpin').value='';document.body.className='';render();toast('Masuk sebagai '+C.user);show('catat');flush()}catch(e){C=old;toast(e.message)}};
 $('list').onclick=e=>{const r=e.target.closest('.row');if(!r)return;cur=r.dataset.n;$('dn').textContent=cur;$('dres').textContent='';$('aamt').value='';$('aamt').dataset.v=0;$('atgl').value=today();$('dlg').showModal()};
 $('acek').onclick=async()=>{try{const r=await api('aktual',{saku:cur,tanggal:$('atgl').value,aktual:num('aamt')});$('dres').innerHTML=`Sistem: <b>${rp(r.sistem)}</b><br>${r.selisih==0?'✓ Cocok':'Selisih: <b>'+rp(r.selisih)+'</b>'}`;refresh()}catch(e){$('dres').textContent='Gagal: '+e.message}};
 $('aclose').onclick=()=>$('dlg').close();
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>show(a.dataset.t));
 function show(t){document.querySelectorAll('section').forEach(s=>s.className=s.id==t?'on':'');document.querySelectorAll('nav a').forEach(a=>a.className=a.dataset.t==t?'on':'')}
-$('gpin').onclick=async()=>{const p=$('pbaru').value.trim();try{await api('ubahPin',{pinBaru:p});C.pin=p;ls.cfg=JSON.stringify(C);$('pbaru').value='';toast('PIN diubah')}catch(e){toast(e.message)}};
-$('keluar').onclick=()=>{if(Q.length&&!confirm('Ada transaksi belum terkirim. Tetap keluar?'))return;ls.removeItem('cfg');ls.removeItem('S');ls.removeItem('Q');location.reload()};
-$('tgl').value=$('mtgl').value=today();if(C){$('curl').value=C.url;$('cuser').value=C.user||''}
-show(C&&C.user?'catat':'setup');render();flush();addEventListener('online',flush);
+$('gpin').onclick=async()=>{const p=$('pbaru').value.trim();try{await api('ubahPin',{pinBaru:p});C.pin=p;$('pbaru').value='';toast('PIN diubah')}catch(e){toast(e.message)}};
+$('keluar').onclick=()=>{if(Q.some(x=>x.u==C.user)&&!confirm('Ada transaksi belum terkirim, akan terkirim saat kamu masuk lagi. Keluar?'))return;location.reload()};
+$('tgl').value=$('mtgl').value=today();$('curl').value=B.url;$('cuser').value=B.user;$('rem').checked=B.rem;ls.removeItem('S');ls.removeItem('cfg');if(!B.url)document.querySelector('details').open=true;
+show('login');if(B.user)$('cpin').focus();let hid=0;document.addEventListener('visibilitychange',()=>{if(document.hidden)hid=Date.now();else if(C&&Date.now()-hid>KUNCI)location.reload()});render();flush();addEventListener('online',flush);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
 </script></body></html>

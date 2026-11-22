@@ -47,7 +47,8 @@ body.out nav,body.out #lo{display:none}#lo{position:fixed;top:calc(env(safe-area
 
 <section id="setup"><h2>Pengaturan</h2>
 
-<h3>Kategori baru</h3><input id="nk" placeholder="Nama kategori"><button id="addk">Tambah kategori</button>
+<h3>Kategori baru</h3><input id="nk" placeholder="Nama kategori"><label>Jenis</label><select id="nj"></select><button id="addk">Tambah kategori</button>
+<h3>Ubah jenis kategori</h3><select id="ek"></select><label>Jenis baru</label><select id="ej"></select><button id="ubj">Simpan jenis</button>
 <h3>Saku baru</h3><input id="ns" placeholder="Nama saku"><label>Jenis</label><select id="nt"><option>Biasa</option><option>Kredit</option></select>
 <label>Saldo awal (kartu kredit: limit)</label><input id="sawal" inputmode="numeric"><button id="adds">Tambah saku</button>
 <h3>Ubah saldo awal / limit</h3><select id="tsaku"></select><label>Saldo awal</label><input id="awal" inputmode="numeric"><button id="seta">Simpan saldo awal</button>
@@ -59,7 +60,7 @@ body.out nav,body.out #lo{display:none}#lo{position:fixed;top:calc(env(safe-area
 <nav><a data-t="catat">Catat</a><a data-t="mut">Mutasi</a><a data-t="saldo">Saldo</a><a data-t="setup">Setup</a></nav>
 <script>
 const $=id=>document.getElementById(id),ls=localStorage,J=(k,d)=>{try{return JSON.parse(ls[k])??d}catch{return d}};
-const KUNCI=5*60e3;let C=null,B=J('base',{url:'',user:'',rem:false}),S={kat:[],saku:[],saldo:{},tally:{}},Q=J('Q',[]),U=J('use',{}),jenis='out',cur;
+const KUNCI=5*60e3,JN=['Pengeluaran','Pemasukan','Keduanya','Tabungan'];let C=null,B=J('base',{url:'',user:'',rem:false}),S={kat:[],saku:[],saldo:{},tally:{}},Q=J('Q',[]),U=J('use',{}),jenis='out',cur;
 const rp=n=>(n<0?'-':'')+'Rp'+Math.abs(Math.round(n)).toLocaleString('id-ID');
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -74,13 +75,13 @@ const opts=(a,k)=>a.slice().sort((x,y)=>(U[k+y]||0)-(U[k+x]||0)).map(x=>`<option
 function cc(){const R='Superbank_Kartu Kredit',cards=S.saku.filter(s=>s.tipe=='Kredit'),used=cards.reduce((a,s)=>a+(+s.awal||0)-(S.saldo[s.nama]||0),0),bg=(S.bunga||{})[R]||0,have=(S.saldo[R]||0)-bg,gap=used-have;
  $('cc').innerHTML=cards.length?`<div class="row" style="flex-direction:column;gap:4px"><small>Terpakai di kartu kredit</small><b>${rp(used)}</b><small>Terkumpul di ${R} (tanpa bunga)</small><b>${rp(have)}</b><small>${gap>0?'Masih kurang':'Sudah cukup, lebih'}</small><b style="color:var(--${gap>0?'out':'in'})">${rp(Math.abs(gap))}</b><small>Bunga Superbank yang sudah masuk (tidak dihitung)</small><b>${rp(bg)}</b></div>`:''}
 function render(){const sk=S.saku.map(s=>s.nama),f=(id,a,k)=>{const v=$(id).value;$(id).innerHTML=opts(a,k);if(v&&a.includes(v))$(id).value=v};
- f('kat',S.kat,'k');['saku','dari','ke','tsaku'].forEach(i=>f(i,sk,'s'));
+ f('kat',S.kat.filter(k=>(jenis=='out'?['Pengeluaran','Keduanya']:['Pemasukan','Keduanya']).includes(k.jenis)).map(k=>k.nama),'k');$('ek').innerHTML=S.kat.map(k=>`<option value="${k.nama}">${k.nama} · ${k.jenis}</option>`).join('');['saku','dari','ke','tsaku'].forEach(i=>f(i,sk,'s'));
  $('list').innerHTML=S.saku.map(s=>{const t=S.tally[s.nama];return `<div class="row" data-n="${s.nama}"><div>${s.nama}<small>${s.tipe=='Kredit'?'Sisa limit':'Saldo'}${t?' · '+(t.selisih==0?'cocok ✓':'selisih '+rp(t.selisih))+' ('+t.tgl+')':''}</small></div><b>${rp(S.saldo[s.nama]||0)}</b></div>`}).join('');
  $('tot').textContent=rp(S.saku.filter(s=>s.tipe!='Kredit').reduce((a,s)=>a+(S.saldo[s.nama]||0),0));
  cc();$('dl').innerHTML=J('ds',[]).map(d=>`<option value="${d}">`).join('')}
 ['amt','mamt','aamt','awal','sawal'].forEach(id=>$(id).oninput=e=>{const d=e.target.value.replace(/\D/g,'');e.target.dataset.v=d;e.target.value=d?(+d).toLocaleString('id-ID'):''});
 const num=id=>+($(id).dataset.v||0);
-function mode(j){jenis=j;$('bo').className=j=='out'?'on':'';$('bi').className=j=='in'?'on':'';$('lsaku').textContent=j=='out'?'Dari saku':'Ke saku'}
+function mode(j){jenis=j;$('bo').className=j=='out'?'on':'';$('bi').className=j=='in'?'on':'';$('lsaku').textContent=j=='out'?'Dari saku':'Ke saku';render()}
 $('bo').onclick=()=>mode('out');$('bi').onclick=()=>mode('in');
 $('save').onclick=()=>{const n=num('amt'),o={a:'addTx',id:uid(),tanggal:$('tgl').value,desk:$('desk').value.trim(),jenis,nominal:n,kat:$('kat').value,saku:$('saku').value};
  if(!n||!o.kat||!o.saku)return toast('Isi nominal, kategori, dan saku');
@@ -91,7 +92,7 @@ $('msave').onclick=()=>{const o={a:'addMut',id:uid(),tanggal:$('mtgl').value,dar
  if(!o.nominal||o.dari==o.ke)return toast('Isi nominal dan pilih dua saku berbeda');
  queue(o);$('mamt').value='';$('mamt').dataset.v=0;$('mcat').value='';toast('Mutasi tersimpan ✓',o.id)};
 async function run(a,p,m){try{await api(a,p);toast(m);refresh()}catch(e){toast('Gagal: '+e.message)}}
-$('addk').onclick=()=>$('nk').value.trim()&&run('addKat',{nama:$('nk').value.trim()},'Kategori ditambah').then(()=>$('nk').value='');
+$('addk').onclick=()=>$('nk').value.trim()&&run('addKat',{nama:$('nk').value.trim(),jenis:$('nj').value},'Kategori ditambah').then(()=>$('nk').value='');
 $('adds').onclick=()=>$('ns').value.trim()&&run('addSaku',{nama:$('ns').value.trim(),tipe:$('nt').value,awal:num('sawal')},'Saku ditambah').then(()=>$('ns').value='');
 $('seta').onclick=()=>run('setAwal',{nama:$('tsaku').value,awal:num('awal')},'Saldo awal disimpan');
 $('csave').onclick=async()=>{const old=C;C={url:$('curl').value.trim(),user:$('cuser').value.trim(),pin:$('cpin').value.trim()};try{S=await api('init');B={url:C.url,user:$('rem').checked?C.user:'',rem:$('rem').checked};ls.base=JSON.stringify(B);$('cpin').value='';document.body.className='';render();toast('Masuk sebagai '+C.user);show('catat');flush()}catch(e){C=old;toast(e.message)}};
@@ -102,6 +103,7 @@ document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>show(a.dataset.t));
 function show(t){document.querySelectorAll('section').forEach(s=>s.className=s.id==t?'on':'');document.querySelectorAll('nav a').forEach(a=>a.className=a.dataset.t==t?'on':'')}
 $('gpin').onclick=async()=>{const p=$('pbaru').value.trim();try{await api('ubahPin',{pinBaru:p});C.pin=p;$('pbaru').value='';toast('PIN diubah')}catch(e){toast(e.message)}};
 $('keluar').onclick=()=>{if(Q.some(x=>x.u==C.user)&&!confirm('Ada transaksi belum terkirim, akan terkirim saat kamu masuk lagi. Keluar?'))return;location.reload()};
+$('nj').innerHTML=$('ej').innerHTML=JN.map(x=>`<option>${x}</option>`).join('');$('ubj').onclick=()=>run('ubahJenis',{nama:$('ek').value,jenis:$('ej').value},'Jenis diubah');
 $('lo').onclick=()=>$('keluar').click();
 $('tgl').value=$('mtgl').value=today();$('curl').value=B.url;$('cuser').value=B.user;$('rem').checked=B.rem;ls.removeItem('S');ls.removeItem('cfg');if(!B.url)document.querySelector('details').open=true;
 show('login');if(B.user)$('cpin').focus();let hid=0;document.addEventListener('visibilitychange',()=>{if(document.hidden)hid=Date.now();else if(C&&Date.now()-hid>KUNCI)location.reload()});render();flush();addEventListener('online',flush);

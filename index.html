@@ -25,7 +25,7 @@ body.out nav,body.out #lo{display:none}#lo{position:fixed;top:calc(env(safe-area
 </style></head><body class="out"><a id="lo">Keluar</a><main>
 <section id="login"><h2>Masuk</h2>
 <label>Username</label><input id="cuser" autocapitalize="none" autocomplete="username">
-<label>PIN (angka)</label><input id="cpin" type="password" inputmode="numeric" autocomplete="current-password">
+<label>PIN (angka)</label><input id="cpin" type="password" inputmode="numeric" autocomplete="current-password"><div id="lerr" style="color:#ef4444;font-size:14px;margin-top:8px;min-height:20px"></div><a id="lupa" style="display:block;margin:6px 0 2px;font-size:14px;color:var(--pri)">Lupa PIN?</a>
 <label style="display:flex;gap:8px;align-items:center;font-size:15px;color:var(--tx)"><input id="rem" type="checkbox" style="width:auto"> Ingat username saya</label>
 <button id="csave">Masuk</button>
 <details style="margin-top:18px;color:var(--mut)"><summary>URL Web App</summary><input id="curl" placeholder="https://script.google.com/macros/s/.../exec"></details></section>
@@ -57,6 +57,10 @@ body.out nav,body.out #lo{display:none}#lo{position:fixed;top:calc(env(safe-area
 </main>
 <dialog id="dlg"><b id="dn"></b><label>Tanggal</label><input id="atgl" type="date"><label>Saldo aktual</label><input id="aamt" inputmode="numeric">
 <div id="dres" style="margin-top:10px"></div><button id="acek">Cek</button><button id="aclose" style="background:none;color:var(--mut)">Tutup</button></dialog>
+<dialog id="dlp"><b>Lupa PIN</b>
+<label>Username</label><input id="lu" autocapitalize="none"><button id="lkirim">Kirim kode ke email</button>
+<div id="lstep2" style="display:none"><label>Kode dari email (6 angka)</label><input id="lkode" inputmode="numeric"><label>PIN baru (4-8 angka)</label><input id="lpin" type="password" inputmode="numeric"><button id="lreset">Ubah PIN</button></div>
+<div id="lmsg" style="margin-top:10px;font-size:14px"></div><button id="ltutup" style="background:none;color:var(--mut)">Tutup</button></dialog>
 <div id="toast"></div>
 <nav><a data-t="catat">Catat</a><a data-t="mut">Mutasi</a><a data-t="saldo">Saldo</a><a data-t="setup">Setup</a></nav>
 <script>
@@ -96,7 +100,7 @@ async function run(a,p,m){try{await api(a,p);toast(m);refresh()}catch(e){toast('
 $('addk').onclick=()=>$('nk').value.trim()&&run('addKat',{nama:$('nk').value.trim(),jenis:$('nj').value},'Kategori ditambah').then(()=>$('nk').value='');
 $('adds').onclick=()=>$('ns').value.trim()&&run('addSaku',{nama:$('ns').value.trim(),tipe:$('nt').value,awal:num('sawal')},'Saku ditambah').then(()=>$('ns').value='');
 $('seta').onclick=()=>run('setAwal',{nama:$('tsaku').value,awal:num('awal')},'Saldo awal disimpan');
-$('csave').onclick=async()=>{const old=C;C={url:$('curl').value.trim(),user:$('cuser').value.trim(),pin:$('cpin').value.trim()};try{S=await api('init');B={url:C.url,user:$('rem').checked?C.user:'',rem:$('rem').checked};ls.base=JSON.stringify(B);$('cpin').value='';document.body.className='';render();toast('Masuk sebagai '+C.user);show('catat');flush()}catch(e){C=old;toast(e.message)}};
+$('csave').onclick=async()=>{const old=C;$('lerr').style.color='#ef4444';$('lerr').textContent='';C={url:$('curl').value.trim(),user:$('cuser').value.trim(),pin:$('cpin').value.trim()};try{S=await api('init');B={url:C.url,user:$('rem').checked?C.user:'',rem:$('rem').checked};ls.base=JSON.stringify(B);$('cpin').value='';document.body.className='';render();toast('Masuk sebagai '+C.user);show('catat');flush()}catch(e){C=old;$('cpin').value='';$('lerr').textContent=!$('curl').value.trim()?'Isi URL Web App dulu (buka bagian URL Web App di bawah).':e instanceof TypeError?'Tidak bisa terhubung. Cek sinyal dan URL Web App.':e instanceof SyntaxError?'URL Web App tidak valid. Cek lagi URL-nya.':e.message}};
 $('list').onclick=e=>{const r=e.target.closest('.row');if(!r)return;cur=r.dataset.n;$('dn').textContent=cur;$('dres').textContent='';$('aamt').value='';$('aamt').dataset.v=0;$('atgl').value=today();$('dlg').showModal()};
 $('acek').onclick=async()=>{try{const r=await api('aktual',{saku:cur,tanggal:$('atgl').value,aktual:num('aamt')});$('dres').innerHTML=`Sistem: <b>${rp(r.sistem)}</b><br>${r.selisih==0?'✓ Cocok':'Selisih: <b>'+rp(r.selisih)+'</b>'}`;refresh()}catch(e){$('dres').textContent='Gagal: '+e.message}};
 $('aclose').onclick=()=>$('dlg').close();
@@ -109,6 +113,12 @@ function lbl(){const d=$('tgl').value;if(!d)return;const [y,m]=d.split('-');$('b
 function defG(){if($('kat').value===defG.k)return;defG.k=$('kat').value;const k=S.kat.find(x=>x.nama==defG.k);$('geser').value=k&&k.geser?1:0;lbl()}
 $('kat').onchange=defG;$('geser').onchange=lbl;$('tgl').onchange=lbl;
 $('ek').onchange=()=>{const k=S.kat.find(x=>x.nama==$('ek').value);if(k){$('ej').value=k.jenis;$('eg').value=k.geser?1:0}};
+async function pub(a,p){const u=$('curl').value.trim();if(!u)throw Error('Isi URL Web App dulu');const r=await fetch(u,{method:'POST',body:JSON.stringify({...p,a})});const j=await r.json();if(!j.ok)throw Error(j.error);return j.data}
+const lm=(t,bad)=>{$('lmsg').style.color=bad?'#ef4444':'';$('lmsg').textContent=t};
+$('lupa').onclick=()=>{$('lu').value=$('cuser').value;$('lstep2').style.display='none';lm('');$('dlp').showModal()};
+$('ltutup').onclick=()=>$('dlp').close();
+$('lkirim').onclick=async()=>{try{await pub('lupa',{user:$('lu').value.trim()});$('lstep2').style.display='block';lm('Kalau username terdaftar dan punya email, kode sudah dikirim (berlaku 10 menit). Cek juga folder spam.')}catch(e){lm(e instanceof TypeError?'Tidak bisa terhubung.':e.message,1)}};
+$('lreset').onclick=async()=>{try{await pub('reset',{user:$('lu').value.trim(),kode:$('lkode').value.trim(),pinBaru:$('lpin').value.trim()});$('dlp').close();$('cuser').value=$('lu').value.trim();$('cpin').value='';$('lerr').style.color='#16a34a';$('lerr').textContent='PIN berhasil diubah. Silakan masuk dengan PIN baru.'}catch(e){lm(e.message,1)}};
 $('lo').onclick=()=>$('keluar').click();
 $('tgl').value=$('mtgl').value=today();lbl();$('curl').value=B.url;$('cuser').value=B.user;$('rem').checked=B.rem;ls.removeItem('S');ls.removeItem('cfg');if(!B.url)document.querySelector('details').open=true;
 show('login');if(B.user)$('cpin').focus();let hid=0;document.addEventListener('visibilitychange',()=>{if(document.hidden)hid=Date.now();else if(C&&Date.now()-hid>KUNCI)location.reload()});render();flush();addEventListener('online',flush);
